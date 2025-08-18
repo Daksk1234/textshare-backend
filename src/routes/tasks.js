@@ -3,7 +3,8 @@ import Joi from "joi";
 import xss from "xss";
 import { Task } from "../models/Task.js";
 import { authRequired } from "../middleware/auth.js";
-import { emitToUser } from "../realtime.js"; // << use this
+import { emitToUser } from "../realtime.js";
+import { enforceFreeLimit } from "../middleware/limits.js"; // ⬅️ NEW
 
 const router = Router();
 router.use(authRequired);
@@ -24,21 +25,30 @@ const taskSchema = Joi.object({
   starred: Joi.boolean().default(false),
 });
 
-// Create
-router.post("/", async (req, res) => {
-  const { value, error } = taskSchema.validate(req.body);
-  if (error) return res.status(400).json({ error: error.message });
-  const t = await Task.create({
-    userId: req.user.id,
-    title: xss(value.title),
-    note: xss(value.note || ""),
-    documents: value.documents,
-    date: value.date || null,
-    starred: !!value.starred,
-  });
-  emitToUser(req.user.id, "create", t);
-  res.json(t);
-});
+// helper to count tasks for the current user
+async function countTasksForUser(req /*, ownerId not needed here */) {
+  return Task.countDocuments({ userId: req.user.id });
+}
+
+// Create (enforce free-plan limit)
+router.post(
+  "/",
+  enforceFreeLimit("tasks", async (req, _ownerId) => countTasksForUser(req)), // ⬅️ NEW
+  async (req, res) => {
+    const { value, error } = taskSchema.validate(req.body);
+    if (error) return res.status(400).json({ error: error.message });
+    const t = await Task.create({
+      userId: req.user.id,
+      title: xss(value.title),
+      note: xss(value.note || ""),
+      documents: value.documents,
+      date: value.date || null,
+      starred: !!value.starred,
+    });
+    emitToUser(req.user.id, "create", t);
+    res.json(t);
+  }
+);
 
 // List (date ASC, with starred/rescheduled precedence if you set that sort)
 router.get("/", async (req, res) => {

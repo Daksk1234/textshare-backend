@@ -3,6 +3,7 @@ import Joi from "joi";
 import xss from "xss";
 import { authRequired } from "../middleware/auth.js";
 import { TextModel } from "../models/Text.js";
+import { enforceFreeLimit } from "../middleware/limits.js"; // ⬅️ NEW
 
 const router = Router();
 router.use(authRequired);
@@ -12,6 +13,11 @@ const schema = Joi.object({
   text: Joi.string().allow(""),
 });
 
+// helper to count texts for current user
+async function countTextsForUser(req /*, ownerId not needed */) {
+  return TextModel.countDocuments({ userId: req.user.id });
+}
+
 // list newest first
 router.get("/", async (req, res) => {
   const items = await TextModel.find({ userId: req.user.id }).sort({
@@ -20,17 +26,21 @@ router.get("/", async (req, res) => {
   res.json(items);
 });
 
-// create
-router.post("/", async (req, res) => {
-  const { value, error } = schema.validate(req.body);
-  if (error) return res.status(400).json({ error: error.message });
-  const doc = await TextModel.create({
-    userId: req.user.id,
-    heading: xss(value.heading || ""),
-    text: xss(value.text || ""),
-  });
-  res.json(doc);
-});
+// create (enforce free-plan limit)
+router.post(
+  "/",
+  enforceFreeLimit("texts", async (req, _ownerId) => countTextsForUser(req)), // ⬅️ NEW
+  async (req, res) => {
+    const { value, error } = schema.validate(req.body);
+    if (error) return res.status(400).json({ error: error.message });
+    const doc = await TextModel.create({
+      userId: req.user.id,
+      heading: xss(value.heading || ""),
+      text: xss(value.text || ""),
+    });
+    res.json(doc);
+  }
+);
 
 // update
 router.put("/:id", async (req, res) => {

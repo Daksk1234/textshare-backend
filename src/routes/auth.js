@@ -23,7 +23,11 @@ router.post("/register", async (req, res) => {
   if (exists)
     return res.status(409).json({ error: "Email already registered" });
 
-  const user = new User({ email: value.email, phone: value.phone });
+  const user = new User({
+    email: value.email,
+    phone: value.phone,
+    plan: "free",
+  });
   user.setPassword(value.password);
   // create OTP
   const otp = generateOTP();
@@ -75,23 +79,38 @@ router.post("/login", async (req, res) => {
   if (error) return res.status(400).json({ error: error.message });
 
   const user = await User.findOne({ email: value.email });
-  if (!user || !user.validatePassword(value.password))
+  if (!user || !user.validatePassword(value.password)) {
     return res.status(401).json({ error: "Invalid credentials" });
+  }
 
-  if (!user.isVerified)
+  if (!user.isVerified) {
     return res.status(403).json({ error: "Account not verified" });
+  }
 
-  const access = jwt.sign(
-    { sub: user._id.toString() },
-    process.env.JWT_ACCESS_SECRET,
-    { expiresIn: "15m" }
-  );
+  // include role in token payload (helps for master-only checks)
+  const payload = { sub: user._id.toString(), role: user.role };
+  const access = jwt.sign(payload, process.env.JWT_ACCESS_SECRET, {
+    expiresIn: "15m",
+  });
   const refresh = jwt.sign(
     { sub: user._id.toString() },
     process.env.JWT_REFRESH_SECRET,
-    { expiresIn: "30d" }
+    {
+      expiresIn: "30d",
+    }
   );
-  res.json({ access, refresh });
+
+  // return role & plan so the client can route masters to the master panel
+  res.json({
+    access,
+    refresh,
+    user: {
+      _id: user._id,
+      email: user.email,
+      role: user.role, // "user" | "master"
+      plan: user.plan, // "free" | "paid"
+    },
+  });
 });
 
 router.post("/refresh", async (req, res) => {

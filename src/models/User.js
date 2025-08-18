@@ -1,4 +1,4 @@
-// User.js placeholder
+// src/models/User.js
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 
@@ -26,6 +26,23 @@ const userSchema = new mongoose.Schema(
     isVerified: { type: Boolean, default: false },
     otp: otpSchema,
     reset: resetSchema,
+
+    // NEW: role & plan
+    role: {
+      type: String,
+      enum: ["user", "master"],
+      default: "user",
+      index: true,
+    },
+    plan: { type: String, enum: ["free", "paid"], default: "free" },
+
+    // (Optional) usage counters – handy for free plan limits
+    usage: {
+      tasks: { type: Number, default: 0 },
+      texts: { type: Number, default: 0 },
+      docs: { type: Number, default: 0 },
+      forms: { type: Number, default: 0 },
+    },
   },
   { timestamps: true }
 );

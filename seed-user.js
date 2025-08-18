@@ -20,7 +20,7 @@ async function seed() {
     await mongoose.connect(MONGO_URI, { dbName: "text_share" });
     console.log("Connected to MongoDB");
 
-    const email = "star281015@gmail.com";
+    const email = "dakshglobalservices@gmail.com";
     const password = "12345678";
 
     const existing = await User.findOne({ email });
