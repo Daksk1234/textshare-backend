@@ -13,6 +13,7 @@ import taskRoutes from "./routes/tasks.js";
 import textsRoutes from "./routes/texts.js";
 import formRoutes from "./routes/forms.js";
 import masterRoutes from "./routes/master.js";
+import suggestionRoutes from "./routes/suggestions.js";
 
 const app = express();
 app.use(helmet());
@@ -38,6 +39,7 @@ app.use("/tasks", generalLimiter, taskRoutes);
 app.use("/texts", generalLimiter, textsRoutes);
 app.use("/forms", generalLimiter, formRoutes);
 app.use("/master", generalLimiter, masterRoutes);
+app.use("/suggestions", generalLimiter, suggestionRoutes);
 
 app.get("/", (req, res) => res.json({ ok: true }));
 
